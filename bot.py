@@ -2,56 +2,75 @@ import tweepy
 import sqlite3
 import time
 
-CONN = sqlite3.connect('data.db')
-CUR = CONN.cursor()
+class RedLine:
+	def __init__(self):
+		'''
+		Connect to sqlite db and get create out API object
+		'''
 
-CONSUMER_KEY = CUR.execute('SELECT Consumer_Key FROM OAuth;').fetchone()[0]
-CONSUMER_SECRET = CUR.execute('SELECT Consumer_Secret FROM OAuth;').fetchone()[0]
-ACCESS_KEY = CUR.execute('SELECT Access_Key FROM OAuth;').fetchone()[0]
-ACCESS_SECRET = CUR.execute('SELECT Access_Secret FROM OAuth;').fetchone()[0]
+		self.conn = sqlite3.connect('data.db')
+		self.cur = self.conn.cursor()
 
-AUTH = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
-AUTH.set_access_token(ACCESS_KEY, ACCESS_SECRET)
-API = tweepy.API(AUTH)
+		self.consumer_key = self.cur.execute('SELECT Consumer_Key FROM OAuth;').fetchone()[0]
+		self.consumer_secret = self.cur.execute('SELECT Consumer_Secret FROM OAuth;').fetchone()[0]
+		self.access_key = self.cur.execute('SELECT Access_Key FROM OAuth;').fetchone()[0]
+		self.access_secret = self.cur.execute('SELECT Access_Secret FROM OAuth;').fetchone()[0]
 
-CTA_ID = API.get_user('CTA').id
+		self.auth = tweepy.OAuthHandler(self.consumer_key, self.consumer_secret)
+		self.auth.set_access_token(self.access_key, self.access_secret)
+		self.api = tweepy.API(self.auth)
 
-def init():
-	'''
-	If bot just went online, do an initial scan of @CTA's 20 most recent tweets.
-	'''
+		self.cta_id = self.api.get_user('CTA').id
 
-	# get 20 most recent @CTA tweets
-	cta_tweets = API.user_timeline(id=CTA_ID)
+		if self.cur.execute('SELECT Last_Tweet FROM Data;').fetchone() == None:
+			# get 20 most recent @CTA tweets as a starting point
+			self.cta_tweets = self.api.user_timeline(id=self.cta_id)
 
-	last_tweet_id = check_if_red_line(cta_tweets)
-	main_loop(last_tweet_id)
-
-def main_loop(last_tweet_id):
-	'''
-	Main loop that uses the most recent discovered tweet as epoch for future scans.
-	'''
-
-	while(True):
-		print('Sleeping ... \n')
-		time.sleep(60)
-		cta_tweets_since_last = API.user_timeline(id=CTA_ID, since_id=last_tweet_id)
+			self.last_tweet_id = self.check_if_red_line(self.cta_tweets)
+			self.cur.execute('INSERT INTO Data (Last_Tweet) VALUES (?);', (self.last_tweet_id, ))
+			self.conn.commit()
+			self.scan_for_tweets(self.last_tweet_id)
 		
-		if cta_tweets_since_last:
-			check_if_red_line(cta_tweets_since_last)
+		else:
+			# we have a last seen tweet saved in db; use this to scan
+			self.scan_for_tweets(self.cur.execute('SELECT Last_Tweet FROM Data;').fetchone()[0])
 
-def check_if_red_line(tweet_list):
-	for tweet in tweet_list:
-		tweet_text = tweet.text.lower()
-		if 'red line' in tweet_text and 'delays' in tweet_text:
-			# retweet the Red Line alert we found
-			print('Retweeting ' + str(tweet.id) + '\n')
+	def scan_for_tweets(self, last_tweet_id):
+		'''
+		Scan all tweets made since last most recent tweet.
 
-	# save most recent tweet we found to db
-	last_tweet_id = tweet_list[0].id
-	CUR.execute("INSERT INTO Data (Last_Tweet) VALUES (?)", (last_tweet_id, ))
-	CONN.commit()
+		:param int last_tweet_id: The largest (most recent) tweet ID from @CTA.
+		'''
 
-	return last_tweet_id
+		while(True):
+			print('Sleeping ... \n')
+			time.sleep(60)
+			cta_tweets_since_last = self.api.user_timeline(id=self.cta_id, since_id=last_tweet_id)
+			
+			if cta_tweets_since_last:
+				self.check_if_red_line(cta_tweets_since_last)
 
-init()
+	def check_if_red_line(self, tweet_list):
+		'''
+		Check list of recent tweets for 'red line' and 'delays'
+
+		:param list tweet_list: List of the tweets the check.
+		:return: The id of the most recent tweet from the list.
+		:rtype: int
+		'''
+
+		for tweet in tweet_list:
+			tweet_text = tweet.text.lower()
+			if 'red line' in tweet_text and 'delays' in tweet_text:
+				# retweet the Red Line alert we found
+				print('Retweeting ' + str(tweet.id) + '\n')
+				# self.api.retweet(tweet.id)
+
+		# save most recent tweet we found to db
+		last_tweet_id = tweet_list[0].id
+		self.cur.execute("UPDATE Data SET Last_Tweet = ?;", (last_tweet_id, ))
+		self.conn.commit()
+
+		return last_tweet_id
+
+red = RedLine()
