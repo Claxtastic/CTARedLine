@@ -4,6 +4,7 @@ import time
 import datetime
 import threading
 import logging
+import logging.handlers as handlers
 
 class RedLine:
 	def __init__(self):
@@ -32,21 +33,26 @@ class RedLine:
 		Scan all tweets made since most recent tweet, or the most recent 20 tweets.
 		'''
 
+		logging.info('Starting ...')
+		print('Starting ... \n')
+
 		if self.last_tweet_id == 0:
-			logging.info('Getting 20 most recent tweets as starting point.')
-			most_recent_twenty = self.API.user_timeline(id=self.CTA_ID)
+			logging.info('Getting 10 most recent tweets as starting point.')
+			most_recent_five = self.API.user_timeline(id=self.CTA_ID, count=10)
+			# reverse the list so the most recent tweet is last
+			most_recent_five.reverse()
 
 			# get the absolute most recent status ID
-			self.last_tweet_id = most_recent_twenty[0].id
-			self.check_if_red_line(most_recent_twenty)
+			self.last_tweet_id = most_recent_five[-1].id
+			self.check_if_red_line(most_recent_five)
 			# push most recent tweet ID to db in case we lose connection
 			self.CUR.execute('UPDATE Data SET Last_Tweet = ?', (self.last_tweet_id, )); self.CONN.commit()
 
 		while True:
-			cta_tweets_since_last = self.API.user_timeline(id=self.CTA_ID, count=50, since_id=self.last_tweet_id)
+			cta_tweets_since_last = self.API.user_timeline(id=self.CTA_ID, count=10, since_id=self.last_tweet_id)
 
 			if cta_tweets_since_last:
-				self.last_tweet_id = cta_tweets_since_last[0].id
+				self.last_tweet_id = cta_tweets_since_last[-1].id
 				self.check_if_red_line(cta_tweets_since_last)
 
 				self.CUR.execute("UPDATE Data SET Last_Tweet = ?", (self.last_tweet_id, )); self.CONN.commit()
@@ -70,7 +76,7 @@ class RedLine:
 				tweet_words = tweet_text.split()
 				if 'red' in tweet_words and '[' in tweet_text:
 					logging.info('Retweeting status %s.', tweet.id)
-					print('Retweeting ' + str(tweet.id) + '\n')
+					print('Retweeting ' + 'https://twitter.com/cta/status/' + str(tweet.id) + '\n')
 					try:
 						self.API.retweet(tweet.id)
 						self._increment_incident_tally()
@@ -88,7 +94,7 @@ class RedLine:
 class CheckDay(RedLine, threading.Thread):
 	def __init__(self):
 		'''
-		Initiliaze RedLine to get our API object and thread
+		Initialize RedLine to get our API object and thread
 		'''
 
 		RedLine.__init__(self)
@@ -107,17 +113,39 @@ class CheckDay(RedLine, threading.Thread):
 				with sqlite3.connect('data.db') as conn:
 					cur = conn.cursor()
 					incidents_this_month, incidents_last_month = cur.execute('SELECT Incidents_This_Month, Incidents_Last_Month FROM Data').fetchone()
-					this_minus_last = incidents_this_month - incidents_last_month
-					if this_minus_last > 0:
-						self.API.update_status("There were {0} incidents in {1}. That's up {2} from last month.".format(incidents_this_month, now.strftime("%B"), abs(this_minus_last)))
-					elif this_minus_last < 0:
-						self.API.update_status("There were {0} incidents in {1}. That's down {2} from last month.".format(incidents_this_month, now.strftime("%B"), abs(this_minus_last)))
+					delta = incidents_this_month - incidents_last_month
+					if delta > 0:
+						self.API.update_status("There were {0} incidents in {1}. That's up {2} from last month.".format(incidents_this_month, now.strftime("%B"), abs(delta)))
+					elif delta < 0:
+						self.API.update_status("There were {0} incidents in {1}. That's down {2} from last month.".format(incidents_this_month, now.strftime("%B"), abs(delta)))
+					
+					# set this month's incident total to be last month's
+					cur.execute('INSERT INTO Data Incidents_Last_Month = {0}'.format(incidents_this_month))
+					# reset counter for this month
+					cur.execute('UPDATE Data SET Incidents_This_Month = 0')
 			time.sleep(84600)
 
-logging.basicConfig(filename='log.log', format='[%(levelname)s] %(asctime)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG)
+###### Setup Logger ######
+log_name = 'log/log.log'
+logger = logging.getLogger('')
+logger.setLevel(logging.INFO)
 
+formatter = logging.Formatter('[%(levelname)s] %(asctime)s: %(message)s')
+
+log_handler = handlers.TimedRotatingFileHandler(log_name, when="midnight", interval=1)
+log_handler.setLevel(logging.INFO)
+log_handler.suffix = "%m%d%Y"
+log_handler.setFormatter(formatter)
+
+logger.addHandler(log_handler)
+##########################
+
+######### Start ##########
+# thread to check the day
 check_day = CheckDay()
 check_day.start()
 
 red = RedLine()
+# start loop
 red.scan_for_tweets()
+##########################
