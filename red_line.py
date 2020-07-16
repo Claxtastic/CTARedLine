@@ -26,7 +26,7 @@ class RedLine:
 
 		self.last_tweet_id = self.CUR.execute('SELECT Last_Tweet FROM Data').fetchone()[0]
 
-	def check_and_set_environment():
+	def check_and_set_environment(self):
 		if os.environ.get('CONSUMER_KEY') is not None:
 			try:
 				cur.execute('CREATE TABLE Data (Last_Tweet NUMBER, Incidents_This_Month NUMBER, Incidents_Last_Month NUMBER)')
