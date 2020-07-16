@@ -18,7 +18,7 @@ def connect_postgres():
 	CONN = psycopg2.connect(DATABASE_URL, sslmode='require')
 	CUR = CONN.cursor()
 
-	CUR.execute('CREATE TABLE IF NOT EXISTS Data (Last_Tweet INTEGER, Incidents_This_Month INTEGER, Incidents_Last_Month INTEGER)')
+	CUR.execute('CREATE TABLE IF NOT EXISTS Data (Last_Tweet BIGINT, Incidents_This_Month INTEGER, Incidents_Last_Month INTEGER)')
 	CUR.execute('SELECT Last_Tweet FROM Data')
 	if CUR.fetchone() is None:
 		# if table was just created
