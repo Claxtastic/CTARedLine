@@ -18,8 +18,8 @@ def connect_postgres():
 	CONN = psycopg2.connect(DATABASE_URL, sslmode='require')
 	CUR = CONN.cursor()
 
-	CUR.execute('CREATE TABLE Data (Last_Tweet INTEGER, Incidents_This_Month INTEGER, Incidents_Last_Month INTEGER)')
-	CUR.execute('INSERT INTO Data VALUES (0, 0, 0)')
+	CUR.execute('CREATE TABLE IF NOT EXISTS Data (Last_Tweet INTEGER DEFAULT 0, Incidents_This_Month INTEGER DEFAULT 0, Incidents_Last_Month INTEGER DEFAULT 0)')
+	# CUR.execute('INSERT INTO Data VALUES (0, 0, 0)')
 	CONN.commit()
 	CUR.close()
 
