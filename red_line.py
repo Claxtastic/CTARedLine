@@ -19,7 +19,9 @@ def connect_postgres():
 	CUR = CONN.cursor()
 
 	CUR.execute('CREATE TABLE Data (Last_Tweet INTEGER, Incidents_This_Month INTEGER, Incidents_Last_Month INTEGER)')
+	CUR.execute('INSERT INTO Data VALUES (0, 0, 0)')
 	CONN.commit()
+	CUR.close()
 
 	CONSUMER_KEY = os.environ.get('CONSUMER_KEY')
 	CONSUMER_SECRET = os.environ.get('CONSUMER_SECRET')
