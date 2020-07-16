@@ -29,8 +29,8 @@ class RedLine:
 	def check_and_set_environment(self):
 		if os.environ.get('CONSUMER_KEY') is not None:
 			try:
-				cur.execute('CREATE TABLE Data (Last_Tweet NUMBER, Incidents_This_Month NUMBER, Incidents_Last_Month NUMBER)')
-				cur.execute('CREATE TABLE OAuth (Consumer_Key TEXT, Consumer_Secret TEXT, Access_Key TEXT, Access_Secret TEXT)')
+				self.cur.execute('CREATE TABLE Data (Last_Tweet NUMBER, Incidents_This_Month NUMBER, Incidents_Last_Month NUMBER)')
+				self.cur.execute('CREATE TABLE OAuth (Consumer_Key TEXT, Consumer_Secret TEXT, Access_Key TEXT, Access_Secret TEXT)')
 			except sqlite3.OperationalError:
 				pass
 			# on heroku
