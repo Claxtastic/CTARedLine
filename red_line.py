@@ -63,7 +63,8 @@ class RedLine:
 
 		self.CTA_ID = self.API.get_user('CTA').id
 
-		self.last_tweet_id = self.CUR.execute('SELECT Last_Tweet FROM Data').fetchone()[0]
+		self.CUR.execute('SELECT Last_Tweet FROM Data')
+		self.last_tweet_id = self.CUR.fetchone()[0]
 
 	def scan_for_tweets(self):
 		'''
@@ -83,7 +84,7 @@ class RedLine:
 			self.last_tweet_id = most_recent_five[-1].id
 			self.check_if_red_line(most_recent_five)
 			# push most recent tweet ID to db in case we lose connection
-			self.CUR.execute('UPDATE Data SET Last_Tweet = ?', (self.last_tweet_id, ))
+			self.CUR.execute("UPDATE Data SET Last_Tweet = {0}".format(self.last_tweet_id))
 			self.CONN.commit()
 
 		while True:
@@ -148,7 +149,8 @@ class CheckDay(threading.Thread):
 			if now.day == 1:
 				logging.info('Tweeting the monthly tally ...')
 
-				incidents_this_month, incidents_last_month = self.CUR.execute('SELECT Incidents_This_Month, Incidents_Last_Month FROM Data').fetchone()
+				self.CUR.execute('SELECT Incidents_This_Month, Incidents_Last_Month FROM Data')
+				incidents_this_month, incidents_last_month = self.CUR.fetchone()
 				delta = incidents_this_month - incidents_last_month
 				if delta > 0:
 					self.RED.API.update_status("There were {0} incidents in {1}. That's up {2} from last month.".format(incidents_this_month, now.strftime("%B"), abs(delta)))
