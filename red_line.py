@@ -15,7 +15,7 @@ def connect_postgres():
 	import psycopg2
 
 	DATABASE_URL = os.environ['DATABASE_URL']
-	CONN = psycopg2.connect(DATABASE_URL)
+	CONN = psycopg2.connect(DATABASE_URL, sslmode='require')
 	CUR = CONN.cursor()
 
 	CUR.execute('CREATE TABLE Data (Last_Tweet INTEGER, Incidents_This_Month INTEGER, Incidents_Last_Month INTEGER)')
