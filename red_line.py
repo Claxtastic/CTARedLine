@@ -1,3 +1,4 @@
+import os
 import tweepy
 import sqlite3
 import time
@@ -15,10 +16,7 @@ class RedLine:
 		self.CONN = sqlite3.connect('data.db')
 		self.CUR = self.CONN.cursor()
 
-		self.CONSUMER_KEY = self.CUR.execute('SELECT Consumer_Key FROM OAuth').fetchone()[0]
-		self.CONSUMER_SECRET = self.CUR.execute('SELECT Consumer_Secret FROM OAuth').fetchone()[0]
-		self.ACCESS_KEY = self.CUR.execute('SELECT Access_Key FROM OAuth').fetchone()[0]
-		self.ACCESS_SECRET = self.CUR.execute('SELECT Access_Secret FROM OAuth').fetchone()[0]
+		self.check_and_set_environment()
 
 		self.AUTH = tweepy.OAuthHandler(self.CONSUMER_KEY, self.CONSUMER_SECRET)
 		self.AUTH.set_access_token(self.ACCESS_KEY, self.ACCESS_SECRET)
@@ -27,6 +25,24 @@ class RedLine:
 		self.CTA_ID = self.API.get_user('CTA').id
 
 		self.last_tweet_id = self.CUR.execute('SELECT Last_Tweet FROM Data').fetchone()[0]
+
+	def check_and_set_environment():
+		if os.environ.get('CONSUMER_KEY') is not None:
+			try:
+				cur.execute('CREATE TABLE Data (Last_Tweet NUMBER, Incidents_This_Month NUMBER, Incidents_Last_Month NUMBER)')
+				cur.execute('CREATE TABLE OAuth (Consumer_Key TEXT, Consumer_Secret TEXT, Access_Key TEXT, Access_Secret TEXT)')
+			except sqlite3.OperationalError:
+				pass
+			# on heroku
+			self.CONSUMER_KEY = os.environ.get('CONSUMER_KEY')
+			self.CONSUMER_SECRET = os.environ.get('CONSUMER_SECRET')
+			self.ACCESS_KEY = os.environ.get('ACCESS_KEY')
+			self.ACCESS_SECRET = os.environ.get('ACCESS_SECRET')
+		else:
+			self.CONSUMER_KEY = self.CUR.execute('SELECT Consumer_Key FROM OAuth').fetchone()[0]
+			self.CONSUMER_SECRET = self.CUR.execute('SELECT Consumer_Secret FROM OAuth').fetchone()[0]
+			self.ACCESS_KEY = self.CUR.execute('SELECT Access_Key FROM OAuth').fetchone()[0]
+			self.ACCESS_SECRET = self.CUR.execute('SELECT Access_Secret FROM OAuth').fetchone()[0]
 
 	def scan_for_tweets(self):
 		'''
